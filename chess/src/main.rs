@@ -1,11 +1,11 @@
-use std::path::Path;
 use sdl2::event::Event;
 use sdl2::pixels::Color;
-use sdl2::render::{Texture, TextureCreator, WindowCanvas};
-use sdl2::EventPump;
 use sdl2::rect::Rect;
+use sdl2::render::{Texture, TextureCreator, WindowCanvas};
 use sdl2::surface::Surface;
 use sdl2::video::WindowContext;
+use sdl2::{EventPump, Sdl};
+use std::path::Path;
 
 const WINDOW_SIZE: u32 = 800;
 const BOARD_SIZE: i32 = 8;
@@ -20,11 +20,14 @@ enum PieceType {
     Rook,
     Knight,
     Bishop,
-    King
+    King,
 }
 
 #[derive(PartialEq)]
-enum PieceColor { Black, White }
+enum PieceColor {
+    Black,
+    White,
+}
 
 struct Pawn<'a> {
     texture: Texture<'a>,
@@ -37,15 +40,35 @@ struct Pawn<'a> {
     piece_type: PieceType,
 }
 
-impl Pawn<'_> {
-    fn new(texture_creator: &TextureCreator<WindowContext>, is_white: bool, row: i32, col: i32) -> Self {
-        let surface_path = if is_white { "assets/white_pawn.bmp" } else { "assets/black_pawn.bmp" };
+impl<'a> Pawn<'a> {
+    fn new(
+        texture_creator: &'a TextureCreator<WindowContext>,
+        is_white: bool,
+        row: i32,
+        col: i32,
+    ) -> Self {
+        let surface_path = if is_white {
+            "assets/white_pawn.bmp"
+        } else {
+            "assets/black_pawn.bmp"
+        };
         let surface = Surface::load_bmp(Path::new(surface_path)).expect("Failed to create surface");
 
-        let texture = texture_creator.create_texture_from_surface(surface).expect("Failed to create texture");
-        let rect = Rect::new(col * TILE_SIZE, row * TILE_SIZE, PIECE_SIZE as u32, PIECE_SIZE as u32);
+        let texture = texture_creator
+            .create_texture_from_surface(surface)
+            .expect("Failed to create texture");
+        let rect = Rect::new(
+            col * TILE_SIZE,
+            row * TILE_SIZE,
+            PIECE_SIZE as u32,
+            PIECE_SIZE as u32,
+        );
 
-        let color = if is_white { PieceColor::White } else { PieceColor::Black };
+        let color = if is_white {
+            PieceColor::White
+        } else {
+            PieceColor::Black
+        };
 
         Pawn {
             texture,
@@ -61,31 +84,43 @@ impl Pawn<'_> {
 }
 
 #[derive(PartialEq)]
-enum TileColor { Black, White }
+enum TileColor {
+    Black,
+    White,
+}
 
 struct Tile {
     rect: Rect,
     tile_color: TileColor,
     is_occupied: bool,
-    is_highlighted: bool
+    is_highlighted: bool,
 }
 
 struct Board<'a> {
     tiles: Vec<Vec<Tile>>,
-    pawns: Vec<Pawn<'a>>
+    pawns: Vec<Pawn<'a>>,
 }
 
-impl Board<'_> {
-    fn new(texture_creator: &TextureCreator<WindowContext>) -> Self {
-        let mut tiles: Vec<Vec<Tile>> = vec!();
+impl<'a> Board<'a> {
+    fn new(texture_creator: &'a TextureCreator<WindowContext>) -> Self {
+        let mut tiles: Vec<Vec<Tile>> = vec![];
         for row in 0..BOARD_SIZE {
-            let mut tile_row: Vec<Tile> = vec!();
+            let mut tile_row: Vec<Tile> = vec![];
             for col in 0..BOARD_SIZE {
                 let tile: Tile = Tile {
-                    rect: Rect::new(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE as u32, TILE_SIZE as u32),
-                    tile_color: if (row + col) % 2 == 0 { TileColor::White } else { TileColor::Black },
+                    rect: Rect::new(
+                        col * TILE_SIZE,
+                        row * TILE_SIZE,
+                        TILE_SIZE as u32,
+                        TILE_SIZE as u32,
+                    ),
+                    tile_color: if (row + col) % 2 == 0 {
+                        TileColor::White
+                    } else {
+                        TileColor::Black
+                    },
                     is_occupied: false,
-                    is_highlighted: false
+                    is_highlighted: false,
                 };
 
                 tile_row.push(tile);
@@ -93,15 +128,12 @@ impl Board<'_> {
             tiles.push(tile_row);
         }
 
-        let mut pawns: Vec<Pawn> = vec!();
+        let mut pawns: Vec<Pawn> = vec![];
         for col in 0..BOARD_SIZE {
             pawns.push(Pawn::new(texture_creator, false, 7, col))
         }
-        
-        Board {
-            tiles,
-            pawns
-        }
+
+        Board { tiles, pawns }
     }
 
     fn render(&mut self, canvas: &mut WindowCanvas) {
@@ -120,7 +152,9 @@ impl Board<'_> {
                         canvas.set_draw_color(Color::RGB(112, 169, 215));
                     }
                 }
-                canvas.fill_rect(self.tiles[row][col].rect).expect("Failed to fill rect");
+                canvas
+                    .fill_rect(self.tiles[row][col].rect)
+                    .expect("Failed to fill rect");
             }
         }
     }
@@ -144,9 +178,7 @@ impl Board<'_> {
         row < BOARD_SIZE as usize && col < BOARD_SIZE as usize
     }
 
-    fn clear_selections(&mut self) {
-
-    }
+    fn clear_selections(&mut self) {}
 
     fn clear_highlights(&mut self) {
         for row in self.tiles.iter_mut() {
@@ -157,58 +189,14 @@ impl Board<'_> {
     }
 }
 
-struct WindowManager {
-    canvas: WindowCanvas,
-    texture_creator: TextureCreator<WindowContext>,
-}
-
-impl WindowManager {
-    fn new(width: u32, height: u32, sdl_context: &sdl2::Sdl) -> Self {
-        let video = sdl_context.video().expect("Failed to create video");
-        let window = video.window("Chess", width, height)
-            .position_centered()
-            .allow_highdpi()
-            .build()
-            .expect("Failed to create window");
-
-        let canvas = window.into_canvas()
-            .accelerated()
-            .present_vsync()
-            .build()
-            .expect("Failed to create canvas");
-
-        let texture_creator = canvas.texture_creator();
-
-        WindowManager {
-            canvas,
-            texture_creator,
-        }
-    }
-}
-
-
 struct Game<'a> {
-    window_manager: WindowManager,
+    canvas: WindowCanvas,
     board: Board<'a>,
     is_running: bool,
     events: EventPump,
 }
 
 impl Game<'_> {
-    pub fn new() -> Self {
-        let sdl = sdl2::init().expect("Failed to initialize SDL");
-        let window_manager = WindowManager::new(800, 800, &sdl);
-        let board = Board::new(&window_manager.texture_creator);
-        let events = sdl.event_pump().expect("Failed to create event pump");
-
-        Game {
-            window_manager,
-            board,
-            is_running: false,
-            events,
-        }
-    }
-
     pub fn run(&mut self) {
         self.is_running = true;
         while self.is_running {
@@ -230,7 +218,7 @@ impl Game<'_> {
     }
 
     fn render(&mut self) {
-        let mut canvas = &mut self.window_manager.canvas;
+        let mut canvas = &mut self.canvas;
 
         canvas.set_draw_color(Color::BLACK);
         canvas.clear();
@@ -242,6 +230,34 @@ impl Game<'_> {
 }
 
 fn main() {
-    let mut game = Game::new();
+    let sdl = sdl2::init().expect("Failed to initialize SDL");
+
+    let video = sdl.video().expect("Failed to create video");
+    let window = video
+        .window("Chess", 800, 800)
+        .position_centered()
+        .allow_highdpi()
+        .build()
+        .expect("Failed to create window");
+
+    let canvas = window
+        .into_canvas()
+        .accelerated()
+        .present_vsync()
+        .build()
+        .expect("Failed to create canvas");
+
+    let texture_creator = canvas.texture_creator();
+
+    let board = Board::new(&texture_creator);
+    let events = sdl.event_pump().expect("Failed to create event pump");
+
+    let mut game = Game {
+        canvas,
+        board,
+        is_running: false,
+        events,
+    };
+
     game.run();
 }
